@@ -30,8 +30,8 @@ def parse_station_links(url):
     return station_links
 
 def parse_schedule_table(table):
-    """Парсим таблицу с расписанием"""
-    schedule = {}
+    """Парсим таблицу с расписанием и возвращаем список времени в формате HH:MM"""
+    schedule = []
     rows = table.find_all('tr')[1:]  # Пропускаем заголовок
     for row in rows:
         cells = row.find_all('td')
@@ -43,9 +43,13 @@ def parse_schedule_table(table):
         
         # Извлекаем минуты, удаляя точки и лишние символы
         minutes = re.findall(r'\d+', minutes_text)
-        schedule[hour] = minutes
         
-    return schedule
+        # Формируем полное время в формате HH:MM
+        for minute in minutes:
+            time_str = f"{int(hour):02d}:{int(minute):02d}"
+            schedule.append(time_str)
+        
+    return sorted(schedule)  # Сортируем по возрастанию времени
 
 def parse_station_schedule(url, station_name):
     """Парсим расписание для конкретной станции"""
