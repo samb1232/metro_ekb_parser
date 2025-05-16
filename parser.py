@@ -29,7 +29,6 @@ def parse_station_links(url):
     
     return station_links
 
-
 def parse_schedule_table(table):
     """Парсим таблицу с расписанием"""
     schedule = {}
@@ -48,7 +47,7 @@ def parse_schedule_table(table):
         
     return schedule
 
-def parse_station_schedule(url):
+def parse_station_schedule(url, station_name):
     """Парсим расписание для конкретной станции"""
     response = requests.get(url, headers=HEADERS, verify=False, timeout=10)
     response.raise_for_status() 
@@ -57,22 +56,35 @@ def parse_station_schedule(url):
     # Находим все таблицы с расписанием
     tables = soup.find_all('table', class_='uss_table_black10')
     
-    if len(tables) < 4:
-        return None
+    # Определяем, является ли станция конечной
+    is_terminal = "Ботаническая" in station_name or "Проспект космонавтов" in station_name
     
-    # Расписание в будни и выходные для обоих направлений
     schedule = {
-        'weekdays': {
-            'to_botanicheskaya': parse_schedule_table(tables[0]),
-            'to_prospekt_kosmonavtov': parse_schedule_table(tables[1])
-        },
-        'weekends': {
-            'to_botanicheskaya': parse_schedule_table(tables[2]),
-            'to_prospekt_kosmonavtov': parse_schedule_table(tables[3])
-        }
+        'weekdays': {},
+        'weekends': {}
     }
     
-    return schedule
+    if is_terminal:
+        # Для конечных станций только 2 таблицы
+        if len(tables) >= 2:
+            # Определяем направление для конечных станций
+            if "Ботаническая" in station_name:
+                # Только в сторону Проспекта Космонавтов
+                schedule['weekdays']['to_prospekt_kosmonavtov'] = parse_schedule_table(tables[0])
+                schedule['weekends']['to_prospekt_kosmonavtov'] = parse_schedule_table(tables[1])
+            elif "Проспект космонавтов" in station_name:
+                # Только в сторону Ботанической
+                schedule['weekdays']['to_botanicheskaya'] = parse_schedule_table(tables[0])
+                schedule['weekends']['to_botanicheskaya'] = parse_schedule_table(tables[1])
+    else:
+        # Для обычных станций 4 таблицы
+        if len(tables) >= 4:
+            schedule['weekdays']['to_botanicheskaya'] = parse_schedule_table(tables[0])
+            schedule['weekdays']['to_prospekt_kosmonavtov'] = parse_schedule_table(tables[1])
+            schedule['weekends']['to_botanicheskaya'] = parse_schedule_table(tables[2])
+            schedule['weekends']['to_prospekt_kosmonavtov'] = parse_schedule_table(tables[3])
+    
+    return schedule if (schedule['weekdays'] or schedule['weekends']) else None
 
 def main():
     # URL страницы со списком станций
@@ -95,7 +107,7 @@ def main():
     
     for station_name, station_url in station_links.items():
         print(f"\nПарсим расписание для станции '{station_name}'...")
-        schedule = parse_station_schedule(station_url)
+        schedule = parse_station_schedule(station_url, station_name)
         
         if schedule:
             all_schedules[station_name] = schedule
